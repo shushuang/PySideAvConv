@@ -7,6 +7,7 @@ from PySide.QtCore import *
 from PySide.QtGui import *
 from config import GlobalConfig
 import time
+from ffcmd import FF_CMD
 NAME = 0
 PROGRESS_RATE = 1
 
@@ -21,7 +22,6 @@ class ConvTask(QObject):
         self.name = name
         self.outputFile = os.path.split(os.path.splitext(name)[0])[-1]+"转码后"
         print(self.outputFile)
-        self.ext = "avi"
         self.outputDir = GlobalConfig.outputDir
         self.progressRate = 0
         self.proc = None
@@ -29,9 +29,17 @@ class ConvTask(QObject):
         self.status = ConvTask.STOP
         self.error = False
         self.logfile = "tmp{}.txt".format(time.time())
+        self.preset = None
+
+    def setPreset(self, preset):
+        self.preset = preset
+
+
+    def postComplete(self):
+        os.remove(self.logfile)
 
     def getDuration(self):
-        cmdstr = "avconv -i {}".format(self.name)
+        cmdstr = "/usr/bin/avconv -i {}".format(self.name)
         print("getDuration cmd:{}".format(cmdstr))
         proc = subprocess.Popen(cmdstr, shell=True,
                                   stdout=subprocess.PIPE,
@@ -45,16 +53,14 @@ class ConvTask(QObject):
         print("duration{0:d}".format(seconds))
         return seconds
 
-
     def continueTask(self):
         if self.status == ConvTask.PAUSE:
             self.proc.send_signal(signal.SIGCONT)
             self.status = ConvTask.RUN
 
     def startTask(self):
-        cmdstr= "/usr/bin/avconv -i {}  {}".format(self.name, self.outputDir
-                                                   + self.outputFile + "."
-                                                   + self.ext)
+        cmdstr = FF_CMD(self).getCmd()
+        print(cmdstr)
         self.status = ConvTask.RUN
         with open(self.logfile, 'wb') as f:
             self.proc = subprocess.Popen(shlex.split(cmdstr), stdout=f,
@@ -70,6 +76,7 @@ class ConvTask(QObject):
         if self.status == ConvTask.RUN:
             self.proc.kill()
             self.status = ConvTask.STOP
+            self.postComplete()
 
     def updateProgress(self):
         if self.status == ConvTask.STOP:
@@ -80,19 +87,22 @@ class ConvTask(QObject):
         with open(self.logfile, "r") as f:
             lastline = f.readlines()[-1]
             print(lastline)
-            if lastline.startswith("video:"):
-                self.progressRate = 100
-                self.status = ConvTask.COMPLETE
+            time_pat = "time=(?P<second>\d+).(\d+)"
+            m = re.search(time_pat, lastline)
+            if(not m):
+                return_status = self.proc.poll()
+                # 任务完整结束
+                if return_status == 0:
+                    self.progressRate = 100
+                    self.status = ConvTask.COMPLETE
+                    self.postComplete()
+               # self.progressRate = 100
+               # self.status = ConvTask.COMPLETE
+                ## self.status = ConvTask.STOP
             else:
-                time_pat = "time=(?P<second>\d+).(\d+)"
-                m = re.search(time_pat, lastline)
-                if(not m):
-                    print("错误结束, 重命名")
-                    ## self.status = ConvTask.STOP
-                else:
-                    current_time = int(m.group("second"))
-                    print("second:{0:d}".format(current_time))
-                    self.progressRate = int(100.0*current_time/self.duration)
+                current_time = int(m.group("second"))
+                print("second:{0:d}".format(current_time))
+                self.progressRate = int(100.0*current_time/self.duration)
 
 
 class ConvTaskModel(QAbstractTableModel):

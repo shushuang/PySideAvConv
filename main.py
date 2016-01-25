@@ -3,64 +3,112 @@ import os
 from PySide.QtCore import *
 from PySide.QtGui import *
 from convert import ConvTask, ConvTaskModel, ConvTaskDelegate, ConvTaskTableView
+from preset import PresetLibrary,Preset
 from config import GlobalConfig
+
+
+
+class SettingDialog(QDialog):
+    def __init__(self,parent=None):
+        super(SettingDialog, self).__init__(parent)
+        mainLayout = QGridLayout()
+        ffmpegLabel = QLabel("ffmpeg或avconv工具路径")
+        ffmpegEdit = QLineEdit("")
+        ffmpegEditBtn = QPushButton("...")
+        outputDirLabel = QLabel("默认输出文件夹路径")
+        oDirEdit = QLineEdit("")
+        oDirEditBtn = QPushButton("...")
+        mainLayout.addWidget(ffmpegLabel, 0, 0)
+        mainLayout.addWidget(ffmpegEdit, 1, 0)
+        mainLayout.addWidget(ffmpegEditBtn, 1, 1)
+        mainLayout.addWidget(outputDirLabel, 2, 0)
+        mainLayout.addWidget(oDirEdit, 3, 0)
+        mainLayout.addWidget(oDirEditBtn, 3, 1)
+        self.setLayout(mainLayout)
+        self.setWindowTitle("设置")
+        ffmpegEditBtn.clicked.connect(self.findFFmpeg)
+        oDirEditBtn.clicked.connect(self.oDir)
+
+    def findFFmpeg(self):
+        fname = QFileDialog.getOpenFileName(self, "选择目录",
+                                                     QDir.currentPath())
+
+    def oDir(self):
+        directory = QFileDialog.getExistingDirectory(self, "选择目录",
+                                                     QDir.currentPath())
+
+
 
 class GeneralSettingWidget(QWidget):
     def __init__(self, parent=None):
         super(GeneralSettingWidget, self).__init__(parent)
-        mainLayout = QVBoxLayout()
+        self.presetLibrary = PresetLibrary()
+        mainLayout = QGridLayout()
+
+        presetLabel = QLabel()
+        presetLabel.setText("Preset:")
+        self.presetComboBox = QComboBox()
+        self.presetComboBox.addItems(self.presetLibrary.getPresets())
+        self.presetComboBox.currentIndexChanged.connect(self.changePreset)
+
         fNameLabel = QLabel(self)
-        fNameLabel.setText("  输出文件名:")
+        fNameLabel.setText("输出文件名:")
 
         fnameEditComboWidget = QWidget(self)
-        fnameEditlayout = QHBoxLayout()
+        fnameEditlayout = QVBoxLayout()
         fnameEditComboWidget.setLayout(fnameEditlayout)
         self.fnameEdit = QLineEdit(self)
-        self.fnameEdit.setText("")
-        fnameSaveBtn = QToolButton(self)
-        fnameSaveBtn.setText("开始转码")
-        fnameSaveBtn.clicked.connect(self.startConvert)
+        # self.startConvertBtn = QToolButton(self)
+        # self.startConvertBtn.setText("开始转码")
+        fnameEditlayout.addWidget(fNameLabel)
         fnameEditlayout.addWidget(self.fnameEdit)
-        fnameEditlayout.addWidget(fnameSaveBtn)
+        # fnameEditlayout.addWidget(self.startConvertBtn)
 
-
-        self.dirLabel = QLabel(self)
-        self.dirLabel.setText("  输出文件夹:")
+        dirLabel = QLabel(self)
+        dirLabel.setText("输出文件夹:")
         dirEditComboWidget = QWidget(self)
         dirEditLayout = QHBoxLayout()
         dirEditComboWidget.setLayout(dirEditLayout)
         self.dirEdit = QLineEdit(self)
-        self.dirEdit.setText("/home/ss/")
+        self.dirEdit.setText(GlobalConfig.outputDir)
         dirEditBtn = QToolButton(self)
         dirEditBtn.setText("...")
         dirEditBtn.clicked.connect(self.openDir)
         dirEditLayout.addWidget(self.dirEdit)
         dirEditLayout.addWidget(dirEditBtn)
 
-        mainLayout.addWidget(fNameLabel)
-        mainLayout.addWidget(fnameEditComboWidget)
-        mainLayout.addWidget(self.dirLabel)
-        mainLayout.addWidget(dirEditComboWidget)
+        mainLayout.addWidget(presetLabel, 0, 0)
+        mainLayout.addWidget(self.presetComboBox, 1, 0)
+        mainLayout.addWidget(fNameLabel, 2, 0)
+        mainLayout.addWidget(fnameEditComboWidget, 3, 0)
+        mainLayout.addWidget(dirLabel, 4, 0)
+        mainLayout.addWidget(dirEditComboWidget, 5, 0)
         self.setLayout(mainLayout)
         self.setDisabled(True)
+        # self.startConvertBtn.clicked.connect(self.startConvert)
+
+
+    def changePreset(self, index):
+        if not self.task:
+            print("task not intialized")
+        else:
+            preset_name = self.presetComboBox.itemText(index)
+            self.task.setPreset(self.presetLibrary.loadPreset(preset_name))
 
     def setTask(self, task):
         self.setDisabled(False)
         self.task = task
+        self.changePreset(self.presetComboBox.currentIndex())
         self.fnameEdit.setText(task.outputFile)
 
-    def startConvert(self):
-        if self.saveParameters():
-            self.task.startTask()
-
     def saveParameters(self):
-        oFileFullName = self.fnameEdit.text() + "." + self.task.ext
+        oFileFullName = self.fnameEdit.text() + "." + self.task.preset.ext
         # check file if exists
         outputDir = self.dirEdit.text()
         outputPath = os.path.join(outputDir, oFileFullName)
         if os.path.exists(outputPath):
-            QMessageBox.warning(self, "错误",
-                                    "存在同名文件，请重命名")
+            QMessageBox.critical(self, "Error",
+                                    "通用设置：存在同名文件，请重命名")
             return False
         self.task.outputFile = self.fnameEdit.text()
         self.task.outputDir = outputDir
@@ -72,12 +120,64 @@ class GeneralSettingWidget(QWidget):
         self.dirEdit.setText(directory)
 
 
+class VideoSettingWidget(QWidget):
+    def __init__(self, parent=None):
+        super(VideoSettingWidget, self).__init__(parent)
+        gridLayout = QGridLayout()
+        resolutionLabel = QLabel()
+        resolutionLabel.setText("视频分辨率")
+        gridLayout.addWidget(resolutionLabel, 0, 0)
+        resolutionWidget = QWidget()
+        resolutionLayout = QHBoxLayout()
+        resolutionWidget.setLayout(resolutionLayout)
+        self.widthEdit = QLineEdit()
+        self.widthEdit.setFixedSize(60,30)
+        multiLabel = QLabel("X")
+        multiLabel.setAlignment(Qt.AlignHCenter | Qt.AlignVCenter)
+        multiLabel.setFixedWidth(30)
+        self.heightEdit = QLineEdit()
+        self.heightEdit.setFixedSize(60, 30)
+        resolutionLayout.addWidget(self.widthEdit)
+        resolutionLayout.addWidget(multiLabel)
+        resolutionLayout.addWidget(self.heightEdit)
+        resolutionLayout.setAlignment(self.heightEdit, Qt.AlignLeft)
+        gridLayout.addWidget(resolutionWidget, 0, 1)
+        self.setLayout(gridLayout)
+
+    def setTask(self, task):
+        self.task = task
+
+    def saveParameters(self):
+        width = self.widthEdit.text().strip()
+        height = self.heightEdit.text().strip()
+        if width == "" and height == "":
+            return True
+        try:
+            int_width = int(width)
+            int_height = int(height)
+            print(int_width)
+            if int_width<0 or int_height < 0:
+                raise Exception()
+        except:
+            QMessageBox.critical(self, "Error", "视频参数设置，输入正确的视频分辨率")
+            return False
+        self.task.preset.video_width = width
+        self.task.preset.video_height = height
+        return True
+
+
+class AudioSettingWidget(QWidget):
+    def __init__(self, parent=None):
+        super(AudioSettingWidget, self).__init__(parent)
+
+
 class Window(QMainWindow):
     addNewTask = Signal()
     def __init__(self, parent=None):
         QMainWindow.__init__(self, parent)
         self.resize(640,480)
-
+        self.task = None
+        self.settingDialog = None
         # create actions
         newAction = QAction(self)
         newAction.setText("添加文件")
@@ -91,6 +191,12 @@ class Window(QMainWindow):
         convertAction = QAction(self)
         convertAction.setText("开始转码")
         convertAction.setIcon(QIcon('./images/convert.png'))
+
+        settingAction = QAction(self)
+        settingAction.setText("设置")
+
+        aboutAction = QAction(self)
+        aboutAction.setText("关于")
 
         # Begin MenuBar
         self.menuBar = QMenuBar(self)
@@ -108,12 +214,14 @@ class Window(QMainWindow):
 
         menuEdit = QMenu(self.menuBar)
         menuEdit.setTitle("编辑")
+        menuEdit.addAction(settingAction)
         self.menuBar.addAction(menuEdit.menuAction())
         menuOption = QMenu(self.menuBar)
         menuOption.setTitle("选项")
         self.menuBar.addAction(menuOption.menuAction())
         menuHelp = QMenu(self.menuBar)
         menuHelp.setTitle("帮助")
+        menuHelp.addAction(aboutAction)
         self.menuBar.addAction(menuHelp.menuAction())
         # End MenuBar
 
@@ -147,24 +255,24 @@ class Window(QMainWindow):
         # self.taskListWidget = QWidget()
         # self.mainSplitter.addWidget(self.taskListWidget)
         self.mainSplitter.addWidget(self.taskTableView)
-        self.generalSettingTabWidget = QTabWidget()
-        self.mainSplitter.addWidget(self.generalSettingTabWidget)
+        self.mainTabWidget = QTabWidget()
+        self.mainSplitter.addWidget(self.mainTabWidget)
 
         # Begin info tabWidget
         self.generalSettingWidget = GeneralSettingWidget(self)
-        self.generalSettingTabWidget.addTab(self.generalSettingWidget, "通用设置")
+        self.mainTabWidget.addTab(self.generalSettingWidget, "通用设置")
         # End info tabWidget
 
         # Begin tab2Widget
-        self.tab_2 = QWidget()
-        self.generalSettingTabWidget.addTab(self.tab_2, "视频参数设置")
+        self.vSettingWidget = VideoSettingWidget()
+        self.mainTabWidget.addTab(self.vSettingWidget, "视频参数设置")
         # End tab2Widget
 
-        self.tab_3 = QWidget()
-        self.generalSettingTabWidget.addTab(self.tab_3, "音频参数设置")
+        self.aSettingWidget = AudioSettingWidget()
+        self.mainTabWidget.addTab(self.aSettingWidget, "音频参数设置")
 
         self.tab_4 = QWidget()
-        self.generalSettingTabWidget.addTab(self.tab_4, "转码命令行")
+        self.mainTabWidget.addTab(self.tab_4, "转码命令行")
 
         self.statusBar = QStatusBar(self)
         self.statusBar.setObjectName("statusBar")
@@ -172,11 +280,29 @@ class Window(QMainWindow):
 
         self.timer = QTimer()
         self.timer.timeout.connect(self.refreshProgress)
-        self.timer.start(2000)
+        self.timer.start(1000)
 
         self.taskTableView.clickOnRow.connect(self.clickOnRow)
         self.taskTableView.deleteTaskSig.connect(self.deleteTask)
+        convertAction.triggered.connect(self.startConvert)
+        aboutAction.triggered.connect(self.about)
         #self.convTaskModel.tasks[0].startTask()
+        settingAction.triggered.connect(self.setting)
+
+
+    @Slot()
+    def setting(self):
+        if not self.settingDialog:
+            self.settingDialog = SettingDialog()
+        self.settingDialog.show()
+        self.settingDialog.raise_()
+        self.settingDialog.activateWindow()
+
+
+
+    @Slot()
+    def about(self):
+        QMessageBox.about(self, self.tr("About"), "本软件基于ffmpeg或libav， 是一个简易的图形界面视频转码器\n 作者：疏爽")
 
     @Slot()
     def deleteTask(self):
@@ -184,7 +310,17 @@ class Window(QMainWindow):
 
     @Slot()
     def clickOnRow(self, row):
+        task = self.convTaskModel.tasks[row]
+        self.task = task
         self.generalSettingWidget.setTask(self.convTaskModel.tasks[row])
+        self.vSettingWidget.setTask(task)
+
+    @Slot()
+    def startConvert(self):
+        if self.generalSettingWidget.saveParameters():
+            if self.vSettingWidget.saveParameters():
+                self.task.startTask()
+
 
     @Slot()
     def addMediaFile(self):
