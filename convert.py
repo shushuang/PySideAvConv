@@ -8,6 +8,7 @@ from PySide.QtGui import *
 from config import GlobalConfig
 import time
 from ffcmd import FF_CMD
+
 NAME = 0
 PROGRESS_RATE = 1
 
@@ -20,9 +21,9 @@ class ConvTask(QObject):
     def __init__(self, name):
         super(ConvTask, self).__init__()
         self.name = name
-        self.outputFile = os.path.split(os.path.splitext(name)[0])[-1]+"转码后"
+        self.outputFile = os.path.split(os.path.splitext(name)[0])[-1]+"_Converted"
         print(self.outputFile)
-        self.outputDir = GlobalConfig.outputDir
+        self.outputDir = GlobalConfig.instance().outputDir
         self.progressRate = 0
         self.proc = None
         self.duration = self.getDuration()
@@ -30,6 +31,9 @@ class ConvTask(QObject):
         self.error = False
         self.logfile = "tmp{}.txt".format(time.time())
         self.preset = None
+
+    def outputPath(self):
+        return os.path.join(self.outputDir, self.outputFile + "." + self.preset.ext)
 
     def setPreset(self, preset):
         self.preset = preset
@@ -39,7 +43,7 @@ class ConvTask(QObject):
         os.remove(self.logfile)
 
     def getDuration(self):
-        cmdstr = "/usr/bin/avconv -i {}".format(self.name)
+        cmdstr = "{} -i {}".format(GlobalConfig.instance().binPath,self.name)
         print("getDuration cmd:{}".format(cmdstr))
         proc = subprocess.Popen(cmdstr, shell=True,
                                   stdout=subprocess.PIPE,
@@ -98,7 +102,7 @@ class ConvTask(QObject):
                     self.postComplete()
                # self.progressRate = 100
                # self.status = ConvTask.COMPLETE
-                ## self.status = ConvTask.STOP
+               ## self.status = ConvTask.STOP
             else:
                 current_time = int(m.group("second"))
                 print("second:{0:d}".format(current_time))

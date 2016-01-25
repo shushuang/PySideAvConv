@@ -13,30 +13,44 @@ class SettingDialog(QDialog):
         super(SettingDialog, self).__init__(parent)
         mainLayout = QGridLayout()
         ffmpegLabel = QLabel("ffmpeg或avconv工具路径")
-        ffmpegEdit = QLineEdit("")
+        self.ffmpegEdit = QLineEdit("")
         ffmpegEditBtn = QPushButton("...")
         outputDirLabel = QLabel("默认输出文件夹路径")
-        oDirEdit = QLineEdit("")
+        self.oDirEdit = QLineEdit("")
         oDirEditBtn = QPushButton("...")
         mainLayout.addWidget(ffmpegLabel, 0, 0)
-        mainLayout.addWidget(ffmpegEdit, 1, 0)
+        mainLayout.addWidget(self.ffmpegEdit, 1, 0)
         mainLayout.addWidget(ffmpegEditBtn, 1, 1)
         mainLayout.addWidget(outputDirLabel, 2, 0)
-        mainLayout.addWidget(oDirEdit, 3, 0)
+        mainLayout.addWidget(self.oDirEdit, 3, 0)
         mainLayout.addWidget(oDirEditBtn, 3, 1)
         self.setLayout(mainLayout)
         self.setWindowTitle("设置")
         ffmpegEditBtn.clicked.connect(self.findFFmpeg)
         oDirEditBtn.clicked.connect(self.oDir)
+        self.loadFromConfig()
+
+    def loadFromConfig(self):
+        self.oDirEdit.setText(GlobalConfig.instance().outputDir)
+        self.ffmpegEdit.setText(GlobalConfig.instance().binPath)
 
     def findFFmpeg(self):
         fname = QFileDialog.getOpenFileName(self, "选择目录",
                                                      QDir.currentPath())
+        if fname[0]:
+            path = fname[0]
+            self.ffmpegEdit.setText(path)
+            GlobalConfig.instance().binPath = path
+            GlobalConfig.instance().save()
+
 
     def oDir(self):
         directory = QFileDialog.getExistingDirectory(self, "选择目录",
                                                      QDir.currentPath())
-
+        if directory:
+            self.oDirEdit.setText(directory)
+            GlobalConfig.instance().outputDir = directory
+            GlobalConfig.instance().save()
 
 
 class GeneralSettingWidget(QWidget):
@@ -70,7 +84,6 @@ class GeneralSettingWidget(QWidget):
         dirEditLayout = QHBoxLayout()
         dirEditComboWidget.setLayout(dirEditLayout)
         self.dirEdit = QLineEdit(self)
-        self.dirEdit.setText(GlobalConfig.outputDir)
         dirEditBtn = QToolButton(self)
         dirEditBtn.setText("...")
         dirEditBtn.clicked.connect(self.openDir)
@@ -100,6 +113,7 @@ class GeneralSettingWidget(QWidget):
         self.task = task
         self.changePreset(self.presetComboBox.currentIndex())
         self.fnameEdit.setText(task.outputFile)
+        self.dirEdit.setText(task.outputDir)
 
     def saveParameters(self):
         oFileFullName = self.fnameEdit.text() + "." + self.task.preset.ext
@@ -117,7 +131,8 @@ class GeneralSettingWidget(QWidget):
     def openDir(self):
         directory = QFileDialog.getExistingDirectory(self, "选择目录",
                                                      QDir.currentPath())
-        self.dirEdit.setText(directory)
+        if directory:
+            self.dirEdit.setText(directory)
 
 
 class VideoSettingWidget(QWidget):
@@ -184,9 +199,9 @@ class Window(QMainWindow):
         newAction.setIcon(QIcon('./images/new.png'))
         newAction.triggered.connect(self.addMediaFile)
 
-        removeAction = QAction(self)
-        removeAction.setText("删除文件")
-        removeAction.setIcon(QIcon('./images/remove.png'))
+        # removeAction = QAction(self)
+        # removeAction.setText("删除文件")
+        # removeAction.setIcon(QIcon('./images/remove.png'))
 
         convertAction = QAction(self)
         convertAction.setText("开始转码")
@@ -208,7 +223,7 @@ class Window(QMainWindow):
         # self.actionAdd_Media = QAction(self)
         # self.actionAdd_Media.setText("Add Media")
         self.menuFile.addAction(newAction)
-        self.menuFile.addAction(removeAction)
+        # self.menuFile.addAction(removeAction)
         self.menuFile.addAction(convertAction)
         self.menuBar.addAction(self.menuFile.menuAction())
 
@@ -216,9 +231,9 @@ class Window(QMainWindow):
         menuEdit.setTitle("编辑")
         menuEdit.addAction(settingAction)
         self.menuBar.addAction(menuEdit.menuAction())
-        menuOption = QMenu(self.menuBar)
-        menuOption.setTitle("选项")
-        self.menuBar.addAction(menuOption.menuAction())
+        # menuOption = QMenu(self.menuBar)
+        # menuOption.setTitle("选项")
+        # self.menuBar.addAction(menuOption.menuAction())
         menuHelp = QMenu(self.menuBar)
         menuHelp.setTitle("帮助")
         menuHelp.addAction(aboutAction)
@@ -230,7 +245,7 @@ class Window(QMainWindow):
         mainToolBar.setObjectName("mainToolBar")
         self.addToolBar(mainToolBar)
         mainToolBar.addAction(newAction)
-        mainToolBar.addAction(removeAction)
+        # mainToolBar.addAction(removeAction)
         mainToolBar.addAction(convertAction)
         # End toolbar
 
@@ -240,12 +255,12 @@ class Window(QMainWindow):
         self.mainSplitter.setStretchFactor(0, 3)
         self.mainSplitter.setStretchFactor(1, 1)
 
-        convTask = ConvTask("/home/ss/Test1.mp4")
-
         # timely update progress rate
         # use add file to add task
         self.convTaskModel = ConvTaskModel()
-        self.convTaskModel.addTask(convTask)
+        # for test use
+        # convTask = ConvTask("/home/ss/Test1.mp4")
+        # self.convTaskModel.addTask(convTask)
 
         self.taskTableView = ConvTaskTableView()
         self.taskTableView.setModel(self.convTaskModel)
@@ -268,11 +283,11 @@ class Window(QMainWindow):
         self.mainTabWidget.addTab(self.vSettingWidget, "视频参数设置")
         # End tab2Widget
 
-        self.aSettingWidget = AudioSettingWidget()
-        self.mainTabWidget.addTab(self.aSettingWidget, "音频参数设置")
-
-        self.tab_4 = QWidget()
-        self.mainTabWidget.addTab(self.tab_4, "转码命令行")
+        # self.aSettingWidget = AudioSettingWidget()
+        # self.mainTabWidget.addTab(self.aSettingWidget, "音频参数设置")
+        #
+        # self.tab_4 = QWidget()
+        # self.mainTabWidget.addTab(self.tab_4, "转码命令行")
 
         self.statusBar = QStatusBar(self)
         self.statusBar.setObjectName("statusBar")
@@ -280,7 +295,7 @@ class Window(QMainWindow):
 
         self.timer = QTimer()
         self.timer.timeout.connect(self.refreshProgress)
-        self.timer.start(1000)
+        self.timer.start(1500)
 
         self.taskTableView.clickOnRow.connect(self.clickOnRow)
         self.taskTableView.deleteTaskSig.connect(self.deleteTask)
@@ -302,7 +317,7 @@ class Window(QMainWindow):
 
     @Slot()
     def about(self):
-        QMessageBox.about(self, self.tr("About"), "本软件基于ffmpeg或libav， 是一个简易的图形界面视频转码器\n 作者：疏爽")
+        QMessageBox.about(self, self.tr("About"), "本软件基于ffmpeg或libav， 目标是提供一个简易的图形界面视频转码器\n 作者：疏爽")
 
     @Slot()
     def deleteTask(self):
@@ -333,10 +348,6 @@ class Window(QMainWindow):
 
     @Slot()
     def refreshProgress(self):
-        # progressRate = self.convTaskModel.tasks[0].progressRate
-        # if progressRate < 100:
-        #     progressRate += 1
-        # self.convTaskModel.tasks[0].progressRate = progressRate
         for task in self.convTaskModel.tasks:
             if(task.status == ConvTask.RUN):
                 task.updateProgress()

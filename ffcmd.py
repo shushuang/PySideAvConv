@@ -1,5 +1,5 @@
-from preset import Preset
 import os
+from config import GlobalConfig
 
 class FF_CMD:
     def __init__(self, task):
@@ -9,7 +9,8 @@ class FF_CMD:
         outputfile = os.path.join(self.task.outputDir,
                                   self.task.outputFile + "." +
                                   self.task.preset.ext)
-        cmdstr= "/usr/bin/avconv -i {} {} {} {} -strict experimental {} ".format(
+        cmdstr= "{} -i {} {} {} {} -strict experimental -preset medium -tune film -crf 0 -threads 4 {} ".format(
+                                                     GlobalConfig.instance().binPath,
                                                      self.task.name,
                                                      self.getVCodec(),
                                                      self.getACodec(),

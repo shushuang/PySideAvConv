@@ -1,0 +1,6 @@
+{   
+    "name":"xvid_avi",
+    "ext":"avi",
+    "video_codecs":"libxvid",
+    "audio_codecs":"libmp3lame"
+}
