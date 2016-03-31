@@ -1,4 +1,5 @@
 # PySideAvConv
 
-运行环境: Ubuntu14.04LTS
-依赖包: python3-pyside, qt4,  avconv
+Tested Environment: Ubuntu14.04LTS should work with other linux distributions.
+
+Dependencies: python3-pyside, qt4,  avconv
